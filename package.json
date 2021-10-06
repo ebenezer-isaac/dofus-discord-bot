@@ -1,0 +1,32 @@
+{
+  "name": "dofus-discord-bot",
+  "version": "1.0.0",
+  "description": "dofus-discord-bot",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "deploy": "node deploy-commands.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ebenezer-isaac/dofus-discord-bot.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ebenezer-isaac/dofus-discord-bot/issues"
+  },
+  "homepage": "https://github.com/ebenezer-isaac/dofus-discord-bot#readme",
+  "keywords": [],
+  "dependencies": {
+    "@discordjs/builders": "^0.6.0",
+    "@discordjs/rest": "^0.1.0-canary.0",
+    "discord-api-types": "^0.23.1",
+    "discord.js": "^13.1.0",
+    "dot-env": "^0.0.1",
+    "dotenv": "^10.0.0",
+    "mongodb": "^4.1.2"
+  }
+}
