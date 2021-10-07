@@ -35,8 +35,8 @@ module.exports = class MongoHelper {
         return response
     }
 
-    async setGuild(guildId, prefix, status) {
-        let guild = {guildId, prefix, status}
+    async setGuild(guildId, prefix, status = false) {
+        let guild = (status === false) ? {guildId, prefix} : {guildId, prefix, status}
         await this.client.db(this.DB_NAME).collection("guilds").updateOne(
             {guildId},
             {$set: guild},

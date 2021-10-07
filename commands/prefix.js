@@ -22,7 +22,7 @@ module.exports = {
         if (prefix === undefined || prefix === "null" || !prefix) {
             prefix = "$"
         }
-        await db.setGuild(guildId, prefix, false)
+        await db.setGuild(guildId, prefix)
         return `The server's prefix has been updated to ${prefix}`
     }
 };
