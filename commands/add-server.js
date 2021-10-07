@@ -8,10 +8,9 @@ module.exports = {
     async execute(interaction, db) {
         if (interaction.user.id.toString() === "812756678361350216") {
             let prefix = interaction.options.getString('prefix')
-            this.addServer(interaction.guildId, prefix, db).then(message => {
-                interaction.editReply(message)
-            })
-            await interaction.deferReply();
+            await interaction.deferReply()
+            let message = await this.addServer(interaction.guildId, prefix, db)
+            await interaction.editReply(message)
         } else {
             return interaction.reply({
                 content: `You are not authorized to perform this interaction. Only the bot owner has access to this command.`,

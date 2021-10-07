@@ -6,10 +6,9 @@ module.exports = {
         .setDescription('Set Current Server as Non-Serviceable'),
     async execute(interaction, db) {
         if (interaction.user.id.toString() === "812756678361350216") {
-            this.delServer(interaction.guildId, db).then(message => {
-                interaction.editReply(message)
-            })
             await interaction.deferReply();
+            let message = await this.delServer(interaction.guildId, db)
+            await interaction.editReply(message)
         } else {
             return interaction.reply({
                 content: `You are not authorized to perform this interaction. Only the bot owner has access to this command.`,

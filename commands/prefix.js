@@ -8,11 +8,9 @@ module.exports = {
     async execute(interaction, db) {
         if (interaction.member.permissions.has("ADMINISTRATOR")) {
             let prefix = interaction.options.getString('prefix')
-            this.updatePrefix(interaction.guildId, prefix, db).then(message => {
-                console.log(message);
-                interaction.editReply(message)
-            })
             await interaction.deferReply();
+            let message = await this.updatePrefix(interaction.guildId, prefix, db)
+            await interaction.editReply(message)
         } else {
             return interaction.reply({
                 content: `You are not authorized to perform this interaction. Only the bot owner has access to this command.`,
@@ -24,7 +22,7 @@ module.exports = {
         if (prefix === undefined || prefix === "null" || !prefix) {
             prefix = "$"
         }
-        await db.setGuild(guildId, prefix, 0)
+        await db.setGuild(guildId, prefix, false)
         return `The server's prefix has been updated to ${prefix}`
     }
 };

@@ -1,10 +1,13 @@
 const MongoHelper = require('./mongodb.js')
-const db = new MongoHelper()
+const EventEmitter = require('events');
+const eventEmitter = new EventEmitter();
+const db = new MongoHelper("dofus", eventEmitter)
 
 async function test() {
     await db.connect()
-    let response = await db.getGuildPrefixes();
-    console.log("test",response);
+    console.log("test");
+    let response = await db.setGuild("797867064882364427", "!", true)
+    console.log(response);
     //db.addGuild("797867064882364427").then(r => console.log(r))
     process.exit(0)
 

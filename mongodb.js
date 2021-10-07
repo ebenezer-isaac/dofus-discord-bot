@@ -29,7 +29,6 @@ module.exports = class MongoHelper {
     }
 
     async deleteGuild(guildId) {
-
         let response = await this.client.db(this.DB_NAME).collection("guilds").updateOne(
             {guildId}, {$set: {status: false}})
         this.eventEmitter.emit('prefixUpdate');
@@ -37,26 +36,28 @@ module.exports = class MongoHelper {
     }
 
     async setGuild(guildId, prefix, status) {
-        let guild
-        if (status === 0) {
-            guild = {
-                guildId,
-                prefix
-            }
-        } else {
-            guild = {
-                guildId,
-                prefix,
-                status
-            }
-        }
+        let guild = {guildId, prefix, status}
         await this.client.db(this.DB_NAME).collection("guilds").updateOne(
             {guildId},
             {$set: guild},
             {upsert: true}
         );
+        if (status) {
+            let response = await this.client.db(this.DB_NAME).collection("guilds").findOne({guildId})
+            if (response.scores === undefined) {
+                await this.resetGuild(guildId)
+            }
+        }
         this.eventEmitter.emit('prefixUpdate');
         return true;
+    }
+
+    async resetGuild(guildId) {
+        await this.client.db(this.DB_NAME).collection("guilds").updateOne(
+            {guildId},
+            {$set: {scores: {}}},
+            {upsert: true}
+        )
     }
 
     async getActiveGuilds() {
@@ -84,69 +85,78 @@ module.exports = class MongoHelper {
         return final
     }
 
-    async getAllUsers() {
-        const result = await this.client.db(this.DB_NAME).collection("users").find()
-        const results = await result.toArray();
-        return JSON.stringify(results);
-    }
-
-    async getUser(email) {
-        const result = await this.client.db(this.DB_NAME).collection("users").findOne({email})
-        return JSON.stringify(result);
-    }
-
-    async getAllDevices(email) {
-        const result = await this.client.db(this.DB_NAME).collection("devices").find().filter({email})
-        const results = await result.toArray();
-        return JSON.stringify(results);
-    }
-
-    async getDevice(deviceId) {
-        const result = await this.client.db(this.DB_NAME).collection("devices").findOne({deviceId})
-        return JSON.stringify(result);
-    }
-
-
-    async addDevice(email, deviceId, deviceName) {
-        const device = {
-            email,
-            deviceId,
-            deviceName,
-            relayStatus: {0: false, 1: false, 2: false, 3: false}
+    async getUserScore(guildId, userId) {
+        const projection = {}
+        projection[`scores.${userId}`] = 1
+        const result = await this.client.db(this.DB_NAME).collection("guilds").find({
+            guildId,
+            "status": true
+        }).project(projection).toArray()
+        if (result[0].scores[userId] === undefined) {
+            return {
+                attack: 0,
+                defence: 0,
+                koth: 0,
+                total: 0
+            }
         }
-        const result = await this.client.db(this.DB_NAME).collection("devices").insertOne(device)
-        return result.insertedId.toString();
+        let score = result[0].scores[userId];
+        score.total = (score.attack === undefined ? 0 : score.attack) + (score.defence === undefined ? 0 : score.defence) + (score.koth === undefined ? 0 : score.koth)
+        return score;
     }
 
-
-    async updateRelayStatus(email, deviceId, relayIndex, relayStatus) {
-        const key = `relayStatus.${relayIndex}`
-        const result = await this.client.db(this.DB_NAME).collection("devices").updateOne(
-            {email, deviceId}, {$set: {[key]: (relayStatus === 'true')}})
-        console.log(result);
-        return JSON.stringify(result)
-
-    }
-
-    async login(email, password) {
-        const result = await this.client.db(this.DB_NAME).collection("users").findOne({email})
-        const response = {result: result ? await bcryptjs.compare(password, result.password) : false}
-        if (response.result === true) {
-            response.email = result.email
+    async getUserScores(guildId) {
+        const result = await this.client.db(this.DB_NAME).collection("guilds").find({
+            guildId,
+            status: true
+        }).project({_id: 0, scores: 1}).toArray()
+        let scores = []
+        for (const [userId, score] of Object.entries(result[0].scores)) {
+            let total = (score.attack === undefined ? 0 : score.attack) + (score.defence === undefined ? 0 : score.defence) + (score.koth === undefined ? 0 : score.koth)
+            scores.push({
+                userId,
+                ...score,
+                total
+            })
         }
-        return JSON.stringify(response)
+        return scores
     }
 
-    async signup(email, password) {
-        const user = {email, password}
-        user.password = await bcryptjs.hash(password, 12)
-        const result = await this.client.db(this.DB_NAME).collection("users").insertOne(user)
-        let response
-        if (result.acknowledged) {
-            response = {result: true, email}
-        } else {
-            response = {result: false}
+    async setScores(guildId, command, members, score) {
+        let updateObject = {}
+        members.forEach(member => {
+            updateObject[`scores.${member}.${command}`] = score
+        })
+        return await this.client.db(this.DB_NAME).collection("guilds").updateOne(
+            {guildId, status: true},
+            {$set: updateObject},
+            {upsert: true})
+    }
+
+    async updateScores(guildId, command, members, score, checkNeg = false) {
+        let updateObject = {}
+        members.forEach(member => {
+            updateObject[`scores.${member}.${command}`] = score
+        })
+        let response = await this.client.db(this.DB_NAME).collection("guilds").updateOne(
+            {guildId, status: true},
+            {$inc: updateObject},
+            {upsert: true})
+        if (checkNeg) {
+            let updateObject = {}
+            let scores = await this.getUserScores(guildId)
+            scores.forEach(score => {
+                ["attack", "defence", "koth"].forEach(command => {
+                    if (score[command] !== undefined && score[command] < 0) {
+                        updateObject[`scores.${score.userId}.${command}`] = 0;
+                    }
+                })
+            })
+            await this.client.db(this.DB_NAME).collection("guilds").updateOne(
+                {guildId, status: true},
+                {$set: updateObject},
+                {upsert: true})
         }
-        return JSON.stringify(response)
+        return response
     }
 }
