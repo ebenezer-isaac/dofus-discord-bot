@@ -1,4 +1,5 @@
 const fs = require('fs');
+const keepAlive = require("./server")
 const {Client, Collection, Intents} = require('discord.js');
 require("dotenv").config()
 const EventEmitter = require('events');
@@ -8,7 +9,7 @@ const db = new MongoHelper("dofus", eventEmitter)
 let prefixes = {}
 let memberNotif = "Note : Mentions/UserID/UserTag can be identified as valid members \n"
 
-const client = new Client({intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES]});
+const client = new Client({intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES, Intents.FLAGS.GUILD_MEMBERS]});
 client.commands = new Collection();
 const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
 for (const file of commandFiles) {
@@ -42,12 +43,14 @@ const toCamelCase = (text) => {
     return text.charAt(0).toUpperCase() + text.slice(1)
 }
 
-const parseMemberList = (command, foundText, notFoundText, memberList) => {
+const parseMemberList = async (command, foundText, notFoundText, memberList, guild) => {
     let notFoundCount = 1
     let members = []
+    let guildMembers = await guild.members.fetch();
     memberList.forEach((member) => {
-        if (parseMember(member).status) {
-            const id = parseMember(member).id
+        const guildMember = parseMember(member, guildMembers)
+        if (guildMember.status) {
+            const id = guildMember.id
             members.push(id)
             foundText += `${members.length}. <@!${id}>\n`;
         } else {
@@ -59,22 +62,34 @@ const parseMemberList = (command, foundText, notFoundText, memberList) => {
         text: `${notFoundCount > 1 ? `${notFoundText} ${memberNotif}` : ""} \n ${members.length > 0 ? `${toCamelCase(command)} ${foundText}` : "No members were identified, Please try again"}`
     }
 }
-const parseMember = (member) => {
-    if (member.startsWith("<@!") && member.endsWith(">") && member.length === 22 && member.match(/\d+/g) != null) {
+const parseMember = (member, guildMembers) => {
+
+    if (member.startsWith("<@!") && member.endsWith(">") && member.length >= 21 && member.match(/\d+/g) != null) {
         member = member.substring(3, member.length - 1)
     }
-    if (member.length === 18 && member.match(/\d+/g) != null) {
-        let guildMember = client.users.cache.find(user => user.id === member)
+    if (member.length >= 17 && member.match(/\d+/g) != null) {
+        let guildMember = guildMembers.find(user => user.user.id === member)
         if (guildMember === undefined) {
             return {status: true, name: "Member Not Found in Server (" + member + ")", id: member}
         }
-        return {status: true, name: guildMember.tag, id: guildMember.id}
+        return {
+            status: true,
+            name: (guildMember.user.username + "#" + guildMember.user.discriminator),
+            id: guildMember.user.id
+        }
     }
-    let guildMember = client.users.cache.find(user => user.tag === member)
+    let guildMember = guildMembers.find(user => (user.user.username + "#" + user.user.discriminator) === member)
     if (guildMember === undefined) {
-        return {status: false}
+        guildMember = guildMembers.find(user => user.nickname === member)
+        if (guildMember === undefined) {
+            return {status: false}
+        }
     }
-    return {status: true, name: guildMember.tag, id: guildMember.id}
+    return {
+        status: true,
+        name: (guildMember.user.username + "#" + guildMember.user.discriminator),
+        id: guildMember.user.id
+    }
 }
 
 const generateExampleCommands = (command) => {
@@ -93,9 +108,9 @@ client.on('messageCreate', async message => {
                 return message.channel.send(`Pong! ${Math.round(client.ws.ping)}ms`);
             } else if (["attack", "defence", "koth"].includes(command)) {
                 args.sort()
-                let score = (parseInt(args[0]) > 0 && args[0].length < 18) ? parseInt(args.shift()) : 1;
+                let score = (parseInt(args[0]) > 0 && args[0].length < 4) ? parseInt(args.shift()) : 1;
                 if (score <= 100) {
-                    let result = parseMemberList(command, `Scores for the following members have been increased by ${score}\n`, "Some members weren't identified from your command :\n", args)
+                    let result = parseMemberList(command, `Scores for the following members have been increased by ${score}\n`, "Some members weren't identified from your command :\n", args, message.guild)
                     result.members.length > 0 ? await db.updateScores(guildId, command, result.members, score) : {}
                     return message.channel.send(result.text);
                 } else {
@@ -107,7 +122,7 @@ client.on('messageCreate', async message => {
                     if (["attack", "defence", "koth"].includes(command)) {
                         let score = parseInt(args.shift())
                         if (score > 0 && score <= 100) {
-                            let result = parseMemberList(command, `Scores for the following members have been set to ${score}\n`, "Some members weren't identified from your command :\n", args)
+                            let result = parseMemberList(command, `Scores for the following members have been set to ${score}\n`, "Some members weren't identified from your command :\n", args, message.guild)
                             result.members.length > 0 ? await db.setScores(guildId, command, result.members, score) : {}
                             return message.channel.send(result.text)
                         } else {
@@ -125,7 +140,7 @@ client.on('messageCreate', async message => {
                     if (["attack", "defence", "koth"].includes(command)) {
                         let score = parseInt(args.shift());
                         if (score > 0 && score <= 100) {
-                            let result = parseMemberList(command, `Scores for the following members have been reduced by ${score}\n`, "Some members weren't identified from your command :\n", args)
+                            let result = parseMemberList(command, `Scores for the following members have been reduced by ${score}\n`, "Some members weren't identified from your command :\n", args, message.guild)
                             score *= -1;
                             result.members.length > 0 ? await db.updateScores(guildId, command, result.members, score, true) : {}
                             return message.channel.send(result.text);
@@ -143,7 +158,8 @@ client.on('messageCreate', async message => {
                     name: message.author.tag,
                     id: message.author.id
                 }
-                args.length > 0 ? scoreCard = parseMember(args.shift()) : {}
+                let guildMembers = await message.guild.members.fetch();
+                args.length > 0 ? scoreCard = parseMember(args.shift(), guildMembers) : {}
                 let scores = await db.getUserScore(message.guildId, scoreCard.id);
                 return message.channel.send(`User ID : ${scoreCard.id}\nUser Name : ${scoreCard.name}\nAttack : ${(scores.attack) ? scores.attack : 0}\nDefence :${(scores.defence) ? scores.defence : 0}\nKoth : ${(scores.koth) ? scores.koth : 0}\nTotal : ${(scores.total) ? scores.total : 0}`)
             } else if (command === "top" || command === "leaderboard") {
@@ -173,8 +189,9 @@ client.on('messageCreate', async message => {
                     return 0;
                 });
                 scores = scores.slice(0, limit);
+                let guildMembers = await message.guild.members.fetch();
                 scores.forEach(score => {
-                    let member = parseMember(score.userId)
+                    let member = parseMember(score.userId, guildMembers)
                     leaderboard += `${member.name} --- ${score[command]}\n`;
                 })
                 return message.channel.send(`Server Leaderboard --- Top ${limit} (${toCamelCase(command)}) : \n\n${leaderboard}`)
@@ -193,5 +210,5 @@ client.on('messageCreate', async message => {
 eventEmitter.on('prefixUpdate', async () => {
     prefixes = await db.getGuildPrefixes();
 });
-
+keepAlive()
 client.login(process.env.TOKEN);
