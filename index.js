@@ -70,12 +70,13 @@ const parseMember = (member, guildMembers) => {
     if (member.length >= 17 && member.match(/\d+/g) != null) {
         let guildMember = guildMembers.find(user => user.user.id === member)
         if (guildMember === undefined) {
-            return {status: true, name: "Member Not Found in Server (" + member + ")", id: member}
+            return {status: true, name: false, id: member, nickname: false}
         }
         return {
             status: true,
             name: (guildMember.user.username + "#" + guildMember.user.discriminator),
-            id: guildMember.user.id
+            id: guildMember.user.id,
+            nickname: guildMember.nickname
         }
     }
     let guildMember = guildMembers.find(user => (user.user.username + "#" + user.user.discriminator) === member)
@@ -88,7 +89,8 @@ const parseMember = (member, guildMembers) => {
     return {
         status: true,
         name: (guildMember.user.username + "#" + guildMember.user.discriminator),
-        id: guildMember.user.id
+        id: guildMember.user.id,
+        nickname: guildMember.nickname
     }
 }
 
@@ -107,14 +109,18 @@ client.on('messageCreate', async message => {
             if (command === 'ping') {
                 return message.channel.send(`Pong! ${Math.round(client.ws.ping)}ms`);
             } else if (["attack", "defence", "koth"].includes(command)) {
-                args.sort()
-                let score = (parseInt(args[0]) > 0 && args[0].length < 4) ? parseInt(args.shift()) : 1;
-                if (score <= 100) {
-                    let result = parseMemberList(command, `Scores for the following members have been increased by ${score}\n`, "Some members weren't identified from your command :\n", args, message.guild)
-                    result.members.length > 0 ? await db.updateScores(guildId, command, result.members, score) : {}
-                    return message.channel.send(result.text);
+                if (args.length > 0) {
+                    args.sort()
+                    let score = (parseInt(args[0]) > 0 && args[0].length < 16) ? parseInt(args.shift()) : 1;
+                    if (score <= 100) {
+                        let result = await parseMemberList(command, `Scores for the following members have been increased by ${score}\n`, "Some members weren't identified from your command :\n", args, message.guild)
+                        result.members.length > 0 ? await db.updateScores(guildId, command, result.members, score) : {}
+                        return message.channel.send(result.text);
+                    } else {
+                        return message.channel.send("Change in Score cannot be greater than 100")
+                    }
                 } else {
-                    return message.channel.send("Change in Score cannot be greater than 100")
+                    return message.channel.send(`Sufficient arguments were not found in your command\nAtleast one member needs to be mentioned`)
                 }
             } else if (command === "set") {
                 if (args.length > 2) {
@@ -122,7 +128,7 @@ client.on('messageCreate', async message => {
                     if (["attack", "defence", "koth"].includes(command)) {
                         let score = parseInt(args.shift())
                         if (score > 0 && score <= 100) {
-                            let result = parseMemberList(command, `Scores for the following members have been set to ${score}\n`, "Some members weren't identified from your command :\n", args, message.guild)
+                            let result = await parseMemberList(command, `Scores for the following members have been set to ${score}\n`, "Some members weren't identified from your command :\n", args, message.guild)
                             result.members.length > 0 ? await db.setScores(guildId, command, result.members, score) : {}
                             return message.channel.send(result.text)
                         } else {
@@ -140,7 +146,7 @@ client.on('messageCreate', async message => {
                     if (["attack", "defence", "koth"].includes(command)) {
                         let score = parseInt(args.shift());
                         if (score > 0 && score <= 100) {
-                            let result = parseMemberList(command, `Scores for the following members have been reduced by ${score}\n`, "Some members weren't identified from your command :\n", args, message.guild)
+                            let result = await parseMemberList(command, `Scores for the following members have been reduced by ${score}\n`, "Some members weren't identified from your command :\n", args, message.guild)
                             score *= -1;
                             result.members.length > 0 ? await db.updateScores(guildId, command, result.members, score, true) : {}
                             return message.channel.send(result.text);
@@ -161,11 +167,11 @@ client.on('messageCreate', async message => {
                 let guildMembers = await message.guild.members.fetch();
                 args.length > 0 ? scoreCard = parseMember(args.shift(), guildMembers) : {}
                 let scores = await db.getUserScore(message.guildId, scoreCard.id);
-                return message.channel.send(`User ID : ${scoreCard.id}\nUser Name : ${scoreCard.name}\nAttack : ${(scores.attack) ? scores.attack : 0}\nDefence :${(scores.defence) ? scores.defence : 0}\nKoth : ${(scores.koth) ? scores.koth : 0}\nTotal : ${(scores.total) ? scores.total : 0}`)
+                return message.channel.send(`User ID : ${scoreCard.id}\nUser Name : ${scoreCard.name}\nAttack : ${scores.attack}\nDefence :${scores.defence}\nKoth : ${scores.koth}\nTotal : ${scores.total}`)
             } else if (command === "top" || command === "leaderboard") {
                 let leaderboard = "";
                 let limit = 10
-                if (args.length > 0) {
+                if (args.length > 0 && !isNaN(parseInt(args[0]))) {
                     limit = parseInt(args.shift())
                     if (limit < 5 || limit > 100) {
                         return message.channel.send(`The leaderboard size should be between 5 and 100\nExample Commands :\n1. !top 25 attack\n2. !top 5 defence`)
@@ -190,11 +196,21 @@ client.on('messageCreate', async message => {
                 });
                 scores = scores.slice(0, limit);
                 let guildMembers = await message.guild.members.fetch();
-                scores.forEach(score => {
+                scores.forEach((score, index) => {
                     let member = parseMember(score.userId, guildMembers)
-                    leaderboard += `${member.name} --- ${score[command]}\n`;
+                    if (member.nickname) {
+                        leaderboard += `${index + 1}. ${member.nickname} --- ${score[command]}\n`;
+                    } else if (member.name) {
+                        leaderboard += `${index + 1}. ${member.name} --- ${score[command]}\n`;
+                    } else {
+                        leaderboard += `${index + 1}. ${member.id} --- ${score[command]}\n`;
+                    }
                 })
-                return message.channel.send(`Server Leaderboard --- Top ${limit} (${toCamelCase(command)}) : \n\n${leaderboard}`)
+                if (scores.length > 0) {
+                    return message.channel.send(`Server Leaderboard --- Top ${limit} (${toCamelCase(command)}) : \n\n${leaderboard}`)
+                } else {
+                    return message.channel.send(`No Scores to show, try adding scores to members!`)
+                }
             } else if (command === "reset") {
                 if (message.member.permissions.has("ADMINISTRATOR")) {
                     await db.resetGuild(guildId)

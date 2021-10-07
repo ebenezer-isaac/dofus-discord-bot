@@ -101,7 +101,12 @@ module.exports = class MongoHelper {
             }
         }
         let score = result[0].scores[userId];
-        score.total = (score.attack === undefined ? 0 : score.attack) + (score.defence === undefined ? 0 : score.defence) + (score.koth === undefined ? 0 : score.koth)
+        score.total = 0;
+        ["attack", "defence", "koth"].forEach(command => {
+            (score[command] === undefined) ? score[command] = 0 : {}
+            score.total += score[command]
+        })
+
         return score;
     }
 
@@ -112,11 +117,14 @@ module.exports = class MongoHelper {
         }).project({_id: 0, scores: 1}).toArray()
         let scores = []
         for (const [userId, score] of Object.entries(result[0].scores)) {
-            let total = (score.attack === undefined ? 0 : score.attack) + (score.defence === undefined ? 0 : score.defence) + (score.koth === undefined ? 0 : score.koth)
+            score.total = 0;
+            ["attack", "defence", "koth"].forEach(command => {
+                (score[command] === undefined) ? score[command] = 0 : {}
+                score.total += score[command]
+            })
             scores.push({
                 userId,
-                ...score,
-                total
+                ...score
             })
         }
         return scores
