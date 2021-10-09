@@ -1,11 +1,11 @@
 const express = require("express")
-const server = express()
-server.all("/",(req,res)=>{
+const expressServer = express()
+expressServer.all("/",(req, res)=>{
   res.send("Bot is running!")
 })
 
 function keepAlive(){
-  server.listen(4000,()=>{
+  expressServer.listen(4000,()=>{
     console.log("Server is ready!")
   })
 }

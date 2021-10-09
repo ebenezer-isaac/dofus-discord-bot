@@ -7,15 +7,16 @@ module.exports = {
     async execute(interaction, db) {
         await interaction.deferReply();
         let message = await this.getDetails(interaction.guildId, interaction.guild.name, interaction.guild.memberCount, db)
+        console.log(message)
         await interaction.editReply(message)
     }, async getDetails(guildId, guildName, guildMemberCount, db) {
         await db.connect()
         const status = await db.checkService(guildId);
         let message = ""
         if (status.status) {
-            message = `\n Status: Active\n Prefix: ${status.prefix}`
+            message = `\nStatus: Active\nPrefix: ${status.prefix}`
         } else {
-            message = "\n Status: In-Active\n\n Contact Bot Owner to change status"
+            message = "\nStatus: In-Active\n\nContact Bot Owner to change status"
         }
         return `Server ID: ${guildId}\nServer Name: ${guildName}\nTotal members: ${guildMemberCount}${message}`
     }

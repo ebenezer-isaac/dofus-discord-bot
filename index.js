@@ -1,13 +1,24 @@
-const fs = require('fs');
-const keepAlive = require("./server")
-const {Client, Collection, Intents} = require('discord.js');
 require("dotenv").config()
+const fs = require('fs');
+const keepAlive = require("./dofus/expressServer")
+const {Client, Collection, Intents, Permissions} = require('discord.js');
 const EventEmitter = require('events');
+const MongoHelper = require('./dofus/MongoHelper.js')
+const {parseMember, parseMemberList, parseIdFromMention, parseLeaderboardArgs} = require("./dofus/discordParser")
+const {
+    generateExampleCommands,
+    toCamelCase,
+    titleCase,
+    scoreDomainsErrorGenerator,
+    scoreRangeErrorGenerator,
+    insufficientArgumentsErrorGenerator
+} = require("./dofus/stringModifier")
+const EmbedGenerator = require("./dofus/embedGenerator")
 const eventEmitter = new EventEmitter();
-const MongoHelper = require('./mongodb.js')
 const db = new MongoHelper("dofus", eventEmitter)
-let prefixes = {}
-let memberNotif = "Note : Mentions/UserID/UserTag can be identified as valid members \n"
+let guildCache = {}
+let scoreDomains = ["attack", "defence", "koth"]
+scoreDomains.sort()
 
 const client = new Client({intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES, Intents.FLAGS.GUILD_MEMBERS]});
 client.commands = new Collection();
@@ -16,16 +27,32 @@ for (const file of commandFiles) {
     const command = require(`./commands/${file}`);
     client.commands.set(command.data.name, command);
 }
+
+const hasModPerms = (guildId, member) => {
+    let memberRoles = member.roles.cache
+    let modRoles = guildCache[guildId].modRoles
+    let modPerm = hasAdminPerms(member);
+    if (modPerm === false && modRoles.length > 0) {
+        modPerm = modRoles.some(roleId => memberRoles.has(roleId))
+    }
+    return modPerm
+}
+
+const hasAdminPerms = (member) => {
+    return member.permissions.has("ADMINISTRATOR")
+}
+
 client.once('ready', async () => {
-    console.log('Connecting!');
+    console.log('Connecting to MongoDB!');
     await db.connect()
-    console.log('Ready!');
-    prefixes = await db.getGuildPrefixes();
+    console.log('Connected!');
+    guildCache = await db.getGuildCache();
+    console.log('Ready for use!')
 });
 
 client.on('interactionCreate', async interaction => {
     if (!interaction.isCommand()) return;
-    const command = client.commands.get(interaction.commandName);
+    const command = client.commands.get(interaction["commandName"]);
     if (!command) return;
     try {
         await command.execute(interaction, db);
@@ -39,192 +66,270 @@ client.on('interactionCreate', async interaction => {
     }
 });
 
-const toCamelCase = (text) => {
-    return text.charAt(0).toUpperCase() + text.slice(1)
-}
-
-const parseMemberList = async (command, foundText, notFoundText, memberList, guild) => {
-    let notFoundCount = 1
-    let members = []
-    let guildMembers = await guild.members.fetch();
-    memberList.forEach((member) => {
-        const guildMember = parseMember(member, guildMembers)
-        if (guildMember.status) {
-            const id = guildMember.id
-            members.push(id)
-            foundText += `${members.length}. <@!${id}>\n`;
-        } else {
-            notFoundText += `${notFoundCount++}. ${member}\n`
-        }
-    })
-    return {
-        members,
-        text: `${notFoundCount > 1 ? `${notFoundText} ${memberNotif}` : ""} \n ${members.length > 0 ? `${toCamelCase(command)} ${foundText}` : "No members were identified, Please try again"}`
-    }
-}
-const parseMember = (member, guildMembers) => {
-
-    if (member.startsWith("<@!") && member.endsWith(">") && member.length >= 21 && member.match(/\d+/g) != null) {
-        member = member.substring(3, member.length - 1)
-    }
-    if (member.length >= 17 && member.match(/\d+/g) != null) {
-        let guildMember = guildMembers.find(user => user.user.id === member)
-        if (guildMember === undefined) {
-            return {status: true, name: false, id: member, nickname: false}
-        }
-        return {
-            status: true,
-            name: (guildMember.user.username + "#" + guildMember.user.discriminator),
-            id: guildMember.user.id,
-            nickname: guildMember.nickname
-        }
-    }
-    let guildMember = guildMembers.find(user => (user.user.username + "#" + user.user.discriminator) === member)
-    if (guildMember === undefined) {
-        guildMember = guildMembers.find(user => user.nickname === member)
-        if (guildMember === undefined) {
-            return {status: false}
-        }
-    }
-    return {
-        status: true,
-        name: (guildMember.user.username + "#" + guildMember.user.discriminator),
-        id: guildMember.user.id,
-        nickname: guildMember.nickname
-    }
-}
-
-const generateExampleCommands = (command) => {
-    return `Example Commands : \n1. !${command} attack 1 @member\n2. !${command} defence 4 @member\n\n`
-}
 
 client.on('messageCreate', async message => {
     if (message.author.bot) return;
     const guildId = message.guildId
-    if (prefixes[guildId]) {
-        const prefix = prefixes[guildId]
+    if (guildCache[guildId]) {
+        const prefix = guildCache[guildId].prefix
         if (message.content.substring(0, prefix.length) === prefix) {
-            let args = message.content.slice(prefix.length).trim().split(/\s+/);
-            const command = args.shift().toLowerCase();
-            if (command === 'ping') {
-                return message.channel.send(`Pong! ${Math.round(client.ws.ping)}ms`);
-            } else if (["attack", "defence", "koth"].includes(command)) {
-                if (args.length > 0) {
-                    args.sort()
-                    let score = (parseInt(args[0]) > 0 && args[0].length < 16) ? parseInt(args.shift()) : 1;
-                    if (score <= 100) {
-                        let result = await parseMemberList(command, `Scores for the following members have been increased by ${score}\n`, "Some members weren't identified from your command :\n", args, message.guild)
-                        result.members.length > 0 ? await db.updateScores(guildId, command, result.members, score) : {}
-                        return message.channel.send(result.text);
-                    } else {
-                        return message.channel.send("Change in Score cannot be greater than 100")
-                    }
-                } else {
-                    return message.channel.send(`Sufficient arguments were not found in your command\nAtleast one member needs to be mentioned`)
-                }
-            } else if (command === "set") {
-                if (args.length > 2) {
-                    let command = args.shift().toLowerCase();
-                    if (["attack", "defence", "koth"].includes(command)) {
-                        let score = parseInt(args.shift())
-                        if (score > 0 && score <= 100) {
-                            let result = await parseMemberList(command, `Scores for the following members have been set to ${score}\n`, "Some members weren't identified from your command :\n", args, message.guild)
-                            result.members.length > 0 ? await db.setScores(guildId, command, result.members, score) : {}
-                            return message.channel.send(result.text)
+            if (message.guild.me.permissionsIn(await message.guild.channels.fetch(message.channelId)).has([Permissions.FLAGS.READ_MESSAGE_HISTORY, Permissions.FLAGS.SEND_MESSAGES])) {
+                let args = message.content.slice(prefix.length).trim().split(/\s+/);
+                const command = args.shift().toLowerCase();
+                if (command === 'ping') {
+                    const embed = new EmbedGenerator(true, command, message.author);
+                    await message.reply(embed.simpleText(`Pong! ${Math.round(client.ws.ping)}ms`));
+                } else if (scoreDomains.includes(command)) {
+                    if (hasModPerms(guildId, message.member)) {
+                        if (args.length > 0) {
+                            args.sort()
+                            let score = (parseInt(args[0]) > 0 && args[0].length < 16) ? parseInt(args.shift()) : 1;
+                            if (score > 0 && score <= 100) {
+                                let result = await parseMemberList(args, message.guild, guildCache[guildId].guildRoles)
+                                let foundUsers = result.filter(entity => (entity.isGuildRole === true || entity.type === 'user'))
+                                foundUsers.length > 0 ? await db.updateScores(scoreDomains, guildId, command, foundUsers, score) : {}
+                                return await message.reply(new EmbedGenerator(true, `${command} Command`, message.author).scoreChange(command, result, score, "add"));
+                            } else {
+                                return await message.reply(new EmbedGenerator(false, `${command} Command Error`, message.author).simpleText(scoreDomainsErrorGenerator(prefix, command, scoreDomains)))
+                            }
                         } else {
-                            return message.channel.send(`There was an error with the score specified in your command\n${generateExampleCommands("set")}Change in score cannot be negative and cannot be greater than 100`);
+                            return await message.reply(new EmbedGenerator(false, `${command} Command Error`, message.author).simpleText(insufficientArgumentsErrorGenerator(prefix, command, scoreDomains)))
                         }
                     } else {
-                        return message.channel.send(`There was an error with the score domain in your command\n${generateExampleCommands("set")}Set command has to be followed by attack/defence/koth. None of them were found`)
+                        return await message.reply(new EmbedGenerator(false, `${command} Command Error`, message.author).permissionError())
                     }
-                } else {
-                    return message.channel.send(`Sufficient arguments were not found in your command\n${generateExampleCommands("set")}`)
-                }
-            } else if (command === "remove") {
-                if (args.length > 2) {
-                    let command = args.shift().toLowerCase();
-                    if (["attack", "defence", "koth"].includes(command)) {
-                        let score = parseInt(args.shift());
-                        if (score > 0 && score <= 100) {
-                            let result = await parseMemberList(command, `Scores for the following members have been reduced by ${score}\n`, "Some members weren't identified from your command :\n", args, message.guild)
-                            score *= -1;
-                            result.members.length > 0 ? await db.updateScores(guildId, command, result.members, score, true) : {}
-                            return message.channel.send(result.text);
+                } else if (command === "set") {
+                    if (hasModPerms(guildId, message.member)) {
+                        if (args.length > 2) {
+                            let scoreDomain = args.shift().toLowerCase();
+                            if (scoreDomains.includes(scoreDomain)) {
+                                let score = parseInt(args.shift())
+                                if (score > 0 && score <= 100) {
+                                    let result = await parseMemberList(args, message.guild, guildCache[guildId].guildRoles)
+                                    let foundUsers = result.filter(entity => (entity.isGuildRole === true || entity.type === 'user'))
+                                    foundUsers.length > 0 ? await db.setScores(guildId, scoreDomain, foundUsers, score) : {}
+                                    return await message.reply(new EmbedGenerator(true, `${command} Command`, message.author).scoreChange(scoreDomain, result, score, "set"));
+                                } else {
+                                    return await message.reply(new EmbedGenerator(false, `${command} Command Error`, message.author).simpleText(scoreRangeErrorGenerator(prefix, command, scoreDomains)))
+                                }
+                            } else {
+                                return await message.reply(new EmbedGenerator(false, `${command} Command Error`, message.author).simpleText(scoreDomainsErrorGenerator(prefix, command, scoreDomains)))
+                            }
                         } else {
-                            return message.channel.send(`There was an error with the score specified in your command\n${generateExampleCommands("remove")}Change in score cannot be negative and cannot be greater than 100`);
+                            return await message.reply(new EmbedGenerator(false, `${command} Command Error`, message.author).simpleText(insufficientArgumentsErrorGenerator(prefix, command, scoreDomains)))
                         }
                     } else {
-                        return message.channel.send(`There was an error with the score domain in your command\n${generateExampleCommands("remove")}Remove command has to be followed by attack/defence/koth. None of them were found`)
+                        await message.reply(new EmbedGenerator(false, `${command} Error`, message.author).permissionError())
                     }
-                } else {
-                    return message.channel.send(`Sufficient arguments were not found in your command\n${generateExampleCommands("remove")}`)
-                }
-            } else if (command === "profile" || command === "score") {
-                let scoreCard = {
-                    name: message.author.tag,
-                    id: message.author.id
-                }
-                let guildMembers = await message.guild.members.fetch();
-                args.length > 0 ? scoreCard = parseMember(args.shift(), guildMembers) : {}
-                let scores = await db.getUserScore(message.guildId, scoreCard.id);
-                return message.channel.send(`User ID : ${scoreCard.id}\nUser Name : ${scoreCard.name}\nAttack : ${scores.attack}\nDefence :${scores.defence}\nKoth : ${scores.koth}\nTotal : ${scores.total}`)
-            } else if (command === "top" || command === "leaderboard") {
-                let leaderboard = "";
-                let limit = 10
-                if (args.length > 0 && !isNaN(parseInt(args[0]))) {
-                    limit = parseInt(args.shift())
-                    if (limit < 5 || limit > 100) {
-                        return message.channel.send(`The leaderboard size should be between 5 and 100\nExample Commands :\n1. !top 25 attack\n2. !top 5 defence`)
-                    }
-                }
-                let scores = await db.getUserScores(guildId)
-                let command = "total"
-                if (args.length > 0) {
-                    command = args.shift().toLowerCase()
-                    if (!["attack", "defence", "koth", "total"].includes(command)) {
-                        return message.channel.send(`There was an error with the score domain in your command\nExample Commands :\n1. !top attack\n2. !top defence\n\nTop command has to be followed by attack/defence/koth. None of them were found`)
-                    }
-                }
-                scores.sort(function (x, y) {
-                    if (x[command] < y[command]) {
-                        return 1;
-                    }
-                    if (x[command] > y[command]) {
-                        return -1;
-                    }
-                    return 0;
-                });
-                scores = scores.slice(0, limit);
-                let guildMembers = await message.guild.members.fetch();
-                scores.forEach((score, index) => {
-                    let member = parseMember(score.userId, guildMembers)
-                    if (member.nickname) {
-                        leaderboard += `${index + 1}. ${member.nickname} --- ${score[command]}\n`;
-                    } else if (member.name) {
-                        leaderboard += `${index + 1}. ${member.name} --- ${score[command]}\n`;
+                } else if (command === "remove") {
+                    if (hasModPerms(guildId, message.member)) {
+                        if (args.length > 2) {
+                            let scoreDomain = args.shift().toLowerCase();
+                            if (scoreDomains.includes(scoreDomain)) {
+                                let score = parseInt(args.shift());
+                                if (score > 0 && score <= 100) {
+                                    let result = await parseMemberList(args, message.guild, guildCache[guildId].guildRoles)
+                                    console.log(result);
+                                    let foundUsers = result.filter(entity => (entity.isGuildRole === true || entity.type === 'user'))
+                                    foundUsers.length > 0 ? await db.updateScores(scoreDomains, guildId, scoreDomain, foundUsers, score * -1, true) : {}
+                                    return await message.reply(new EmbedGenerator(true, `${command} Command`, message.author).scoreChange(scoreDomain, result, score, "del"));
+                                } else {
+                                    return await message.reply(new EmbedGenerator(false, `${command} Command Error`, message.author).simpleText(scoreRangeErrorGenerator(prefix, command, scoreDomains)))
+                                }
+                            } else {
+                                return await message.reply(new EmbedGenerator(false, `${command} Command Error`, message.author).simpleText(scoreDomainsErrorGenerator(prefix, command, scoreDomains)))
+                            }
+                        } else {
+                            return await message.reply(new EmbedGenerator(false, `${command} Command Error`, message.author).simpleText(insufficientArgumentsErrorGenerator(prefix, command, scoreDomains)))
+                        }
                     } else {
-                        leaderboard += `${index + 1}. ${member.id} --- ${score[command]}\n`;
+                        await message.reply(new EmbedGenerator(false, `${command} Command Error`, message.author).permissionError())
                     }
-                })
-                if (scores.length > 0) {
-                    return message.channel.send(`Server Leaderboard --- Top ${limit} (${toCamelCase(command)}) : \n\n${leaderboard}`)
-                } else {
-                    return message.channel.send(`No Scores to show, try adding scores to members!`)
+                } else if (command === "profile" || command === "score") {
+                    let entity = parseMember(args.length > 0 ? args.shift() : message.author.id, await message.guild.members.fetch(), guildCache[guildId].guildRoles, message.guild.roles.cache)
+                    console.log(entity);
+                    if (entity.type === 'user' || entity.isGuildRole === true) {
+                        if (entity.type === 'role') {
+                            entity.scoreCard = await db.getScore(scoreDomains, guildId, entity.id, true)
+                            return await message.reply(new EmbedGenerator(true, `Guild Profile`, message.author).roleProfile(entity, scoreDomains))
+                        } else {
+                            entity.scoreCard = await db.getScore(scoreDomains, guildId, entity.id)
+                            console.log("index scoreCard", entity.scoreCard)
+                            return await message.reply(new EmbedGenerator(true, `User Profile`, message.author).userProfile(entity, scoreDomains))
+                        }
+                    } else {
+                        let text = (entity.type === 'bot') ? 'Bots cannot have Score Cards' : '';
+                        text = (entity.type === 'role' && text === '') ? 'The mentioned role is not registered as Guild Role' : "The mention provided in your command could not be identified"
+                        return await message.reply(new EmbedGenerator(false, `Profile Command`, message.author).simpleText(text))
+                    }
+                } else if (command === "top" || command === "leaderboard") {
+                    let response = parseLeaderboardArgs(args, scoreDomains)
+                    if (response.domainError) {
+                        return await message.reply(new EmbedGenerator(false, `Member Leaderboard Command`, message.author).simpleText(scoreDomainsErrorGenerator(prefix, command, scoreDomains)))
+                    }
+                    if (response.scoreError) {
+                        return await message.reply(new EmbedGenerator(false, `Member Leaderboard Command`, message.author).simpleText(`The leaderboard size should be between 5 and 100\n${generateExampleCommands(prefix, command, scoreDomains)}`))
+                    }
+                    let {limit, scoreDomain} = response
+                    let scores = await db.getScores(scoreDomains, guildId, scoreDomain)
+                    if (scores.length > 0) {
+                        scores = scores.slice(0, limit);
+                        return await message.reply(new EmbedGenerator(true, `Top ${limit} ${scoreDomain} Member Scores`, message.author).leaderboard(scores, scoreDomain))
+                    } else {
+                        return await message.reply(new EmbedGenerator(false, `Member Leaderboard Command`, message.author).simpleText(`No Scores to show, try adding scores to members!`))
+                    }
+                } else if (command === "topguild" || command === "leaderboardguild") {
+                    let response = parseLeaderboardArgs(args, scoreDomains)
+                    if (response.domainError) {
+                        return await message.reply(new EmbedGenerator(false, `Guild Leaderboard Command`, message.author).simpleText(scoreDomainsErrorGenerator(prefix, command, scoreDomains)))
+                    }
+                    if (response.scoreError) {
+                        return await message.reply(new EmbedGenerator(false, `Guild Leaderboard Command`, message.author).simpleText(`The leaderboard size should be between 5 and 100\n${generateExampleCommands(prefix, command, scoreDomains)}`))
+                    }
+                    let {limit, scoreDomain} = response
+                    let scores = await db.getScores(scoreDomains, guildId, scoreDomain, true)
+                    if (scores.length > 0) {
+                        scores = scores.slice(0, limit);
+                        return await message.reply(new EmbedGenerator(true, `Top ${limit} ${scoreDomain} Guild Scores`, message.author).leaderboard(scores, scoreDomain))
+                    } else {
+                        return await message.reply(new EmbedGenerator(false, `Guild Leaderboard Command`, message.author).simpleText(`No Scores to show, try adding scores to guilds!`))
+                    }
+                } else if (command === "reset") {
+                    if (hasAdminPerms(message.member)) {
+                        await db.resetGuild(guildId)
+                        return await message.reply(new EmbedGenerator(true, `Reset Command`, message.author).simpleText(`All Scores have been reset as requested`))
+                    } else {
+                        return await message.reply(new EmbedGenerator(true, command, message.author).permissionError())
+                    }
+                } else if (command === "addmod") {
+                    if (hasAdminPerms(message.member)) {
+                        if (args.length !== 1) {
+                            return await message.reply(new EmbedGenerator(false, `Add Mod Command`, message.author).simpleText(`Only one role can be added at a time.`))
+                        }
+                        let role = parseIdFromMention(args.shift().toLowerCase()).entityIdentifier
+                        role = message.guild.roles.cache.find(r => r.id === role);
+                        if (role !== undefined) {
+                            role = role.id.toString()
+                            let modRoles = guildCache[guildId].modRoles
+                            if (modRoles.includes(role)) {
+                                return await message.reply(new EmbedGenerator(false, `Add Mod Command`, message.author).simpleText(`Mentioned Role already exists as Mod Role`))
+                            } else {
+                                modRoles.push(role)
+                                await db.updateModRoles(guildId, modRoles)
+                                return await message.reply(new EmbedGenerator(true, `Add Mod Command`, message.author).simpleText(`Role has been added successfully`))
+                            }
+                        } else {
+                            return await message.reply(new EmbedGenerator(false, `Add Mod Command`, message.author).simpleText(`Role could not be identified`))
+                        }
+                    } else {
+                        await message.reply(new EmbedGenerator(true, command, message.author).permissionError())
+                    }
+                } else if (command === "delmod") {
+                    if (hasAdminPerms(message.member)) {
+                        if (args.length !== 1) {
+                            return await message.reply(new EmbedGenerator(false, `Delete Mod Command`, message.author).simpleText(`Only one role can be deleted at a time.`))
+                        }
+                        let role = parseIdFromMention(args.shift().toLowerCase()).entityIdentifier
+                        role = message.guild.roles.cache.find(r => r.id === role)
+                        if (role !== undefined) {
+                            role = role.id.toString()
+                            let modRoles = guildCache[guildId].modRoles
+                            if (modRoles.includes(role)) {
+                                modRoles = modRoles.filter(item => item !== role);
+                                await db.updateModRoles(guildId, modRoles)
+                                return await message.reply(new EmbedGenerator(true, `Delete Mod Command`, message.author).simpleText(`Role has been removed successfully`))
+                            } else {
+                                return await message.reply(new EmbedGenerator(false, `Delete Mod Command`, message.author).simpleText(`The mentioned Role is not a Mod Role`))
+                            }
+                        } else {
+                            return await message.reply(new EmbedGenerator(false, `Delete Mod Command`, message.author).simpleText(`Role could not be identified`))
+                        }
+                    } else {
+                        await message.reply(new EmbedGenerator(true, command, message.author).permissionError())
+                    }
+                } else if (command === "listmod" || command === "listmods") {
+                    let modRoles = guildCache[guildId].modRoles
+                    if (modRoles.length > 0) {
+                        let modText = "\n"
+                        modRoles.forEach((roleId, index) => {
+                            let role = message.guild.roles.cache.find(r => r.id === roleId)
+                            modText += `${index + 1}. <@&${role.id}>\n`;
+                        })
+                        return await message.reply(new EmbedGenerator(true, `Mod List`, message.author).simpleText(modText))
+                    } else {
+                        return await message.reply(new EmbedGenerator(false, `Mod List`, message.author).simpleText(`No Roles have been added yet!`))
+                    }
+                } else if (command === "addguild") {
+                    if (hasAdminPerms(message.member)) {
+                        if (args.length !== 1) {
+                            return await message.reply(new EmbedGenerator(false, `Add Guild Command`, message.author).simpleText(`Only one role can be added at a time.`))
+                        }
+                        let role = parseIdFromMention(args.shift().toLowerCase()).entityIdentifier
+                        role = message.guild.roles.cache.find(r => r.id === role);
+                        if (role !== undefined) {
+                            role = role.id.toString()
+                            let guildRoles = guildCache[guildId].guildRoles
+                            if (guildRoles.includes(role)) {
+                                return await message.reply(new EmbedGenerator(false, `Add Guild Command`, message.author).simpleText(`Mentioned Role is already registered as Guild Role`))
+                            } else {
+                                guildRoles.push(role)
+                                await db.updateGuildRoles(guildId, role, guildRoles, scoreDomains)
+                                return await message.reply(new EmbedGenerator(true, `Add Guild Command`, message.author).simpleText(`Guild Role has been added successfully`))
+                            }
+                        } else {
+                            return await message.reply(new EmbedGenerator(false, `Add Guild Command`, message.author).simpleText(`Mentioned role could not be identified`))
+                        }
+                    } else {
+                        await message.reply(new EmbedGenerator(true, command, message.author).permissionError())
+                    }
+                } else if (command === "delguild") {
+                    if (hasAdminPerms(message.member)) {
+                        if (args.length !== 1) {
+                            return await message.reply(new EmbedGenerator(false, `Delete Guild Command`, message.author).simpleText(`Only one role can be deleted at a time.`))
+                        }
+                        let role = parseIdFromMention(args.shift().toLowerCase()).entityIdentifier
+                        console.log(role)
+                        role = message.guild.roles.cache.find(r => r.id === role)
+                        if (role !== undefined) {
+                            role = role.id.toString()
+                            let guildRoles = guildCache[guildId].guildRoles
+                            if (guildRoles.includes(role)) {
+                                guildRoles = guildRoles.filter(item => item !== role);
+                                await db.updateGuildRoles(guildId, role, guildRoles, scoreDomains, true)
+                                return await message.reply(new EmbedGenerator(true, `Delete Guild Command`, message.author).simpleText(`Guild Role has been removed successfully`))
+                            } else {
+                                return await message.reply(new EmbedGenerator(false, `Delete Guild Command`, message.author).simpleText(`The mentioned Role is not a Guild Role`))
+                            }
+                        } else {
+                            return await message.reply(new EmbedGenerator(false, `Delete Guild Command`, message.author).simpleText(`Role could not be identified`))
+                        }
+                    } else {
+                        await message.reply(new EmbedGenerator(true, command, message.author).permissionError())
+                    }
+                } else if (command === "listguild" || command === "listguilds") {
+                    let guildRoles = guildCache[guildId].guildRoles
+                    if (guildRoles.length > 0) {
+                        let modText = "\n"
+                        guildRoles.forEach((roleId, index) => {
+                            let role = message.guild.roles.cache.find(r => r.id === roleId)
+                            modText += `${index + 1}. <@&${role.id}>\n`;
+                        })
+                        return await message.reply(new EmbedGenerator(true, `Guild List`, message.author).simpleText(modText))
+                    } else {
+                        return await message.reply(new EmbedGenerator(false, `Guild List`, message.author).simpleText(`No Guild Roles have been added yet!`))
+                    }
                 }
-            } else if (command === "reset") {
-                if (message.member.permissions.has("ADMINISTRATOR")) {
-                    await db.resetGuild(guildId)
-                    return message.channel.send(`All Scores have been reset as requested`)
-                } else {
-                    return message.channel.send(`Administrator permissions are required to execute this command`)
-                }
+            } else {
+                const embed = new EmbedGenerator(false, "Bot Permission Error", message.author)
+                await message.author.send(embed.simpleText(`I need the following permissions in the channel to attend to your request:\n1. Read Message History\n2. Send Message\n\nPlease allow them for me and try again.\n\nChannel Name : ${message.channel.name}\nServer Name : ${message.guild.name}`));
             }
         }
     }
 });
 
-eventEmitter.on('prefixUpdate', async () => {
-    prefixes = await db.getGuildPrefixes();
+eventEmitter.on('cacheUpdate', async () => {
+    guildCache = await db.getGuildCache();
 });
 keepAlive()
-client.login(process.env.TOKEN);
+client.login(process.env.TOKEN).then(() => {
+});
