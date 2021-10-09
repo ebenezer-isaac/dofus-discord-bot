@@ -44,7 +44,6 @@ module.exports = class MongoHelper {
         )
         if (status) {
             let response = await this.client.db(this.DB_NAME).collection("guilds").findOne({guildId})
-            console.log(response);
             if (response.members === undefined || response.modRoles === undefined || response.guilds === undefined) {
                 let updateObject = {};
                 (response.memberScores === undefined) ? updateObject.memberScores = {} : {};
@@ -126,7 +125,6 @@ module.exports = class MongoHelper {
 
     async getScore(scoreDomains, guildId, id, role = false) {
         let scoreList = await this.getScores(scoreDomains, guildId, 'total', role)
-        console.log("getScore", scoreList)
         for (let index = 0; index < scoreList.length; index++) {
             if (scoreList[index].id === id) {
                 scoreList[index].rank = index + 1

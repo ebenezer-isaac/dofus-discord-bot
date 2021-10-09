@@ -127,7 +127,6 @@ client.on('messageCreate', async message => {
                                 let score = parseInt(args.shift());
                                 if (score > 0 && score <= 100) {
                                     let result = await parseMemberList(args, message.guild, guildCache[guildId].guildRoles)
-                                    console.log(result);
                                     let foundUsers = result.filter(entity => (entity.isGuildRole === true || entity.type === 'user'))
                                     foundUsers.length > 0 ? await db.updateScores(scoreDomains, guildId, scoreDomain, foundUsers, score * -1, true) : {}
                                     return await message.reply(new EmbedGenerator(true, `${command} Command`, message.author).scoreChange(scoreDomain, result, score, "del"));
@@ -145,14 +144,12 @@ client.on('messageCreate', async message => {
                     }
                 } else if (command === "profile" || command === "score") {
                     let entity = parseMember(args.length > 0 ? args.shift() : message.author.id, await message.guild.members.fetch(), guildCache[guildId].guildRoles, message.guild.roles.cache)
-                    console.log(entity);
                     if (entity.type === 'user' || entity.isGuildRole === true) {
                         if (entity.type === 'role') {
                             entity.scoreCard = await db.getScore(scoreDomains, guildId, entity.id, true)
                             return await message.reply(new EmbedGenerator(true, `Guild Profile`, message.author).roleProfile(entity, scoreDomains))
                         } else {
                             entity.scoreCard = await db.getScore(scoreDomains, guildId, entity.id)
-                            console.log("index scoreCard", entity.scoreCard)
                             return await message.reply(new EmbedGenerator(true, `User Profile`, message.author).userProfile(entity, scoreDomains))
                         }
                     } else {
@@ -286,7 +283,6 @@ client.on('messageCreate', async message => {
                             return await message.reply(new EmbedGenerator(false, `Delete Guild Command`, message.author).simpleText(`Only one role can be deleted at a time.`))
                         }
                         let role = parseIdFromMention(args.shift().toLowerCase()).entityIdentifier
-                        console.log(role)
                         role = message.guild.roles.cache.find(r => r.id === role)
                         if (role !== undefined) {
                             role = role.id.toString()

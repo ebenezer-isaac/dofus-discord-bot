@@ -42,8 +42,6 @@ function insufficientArgumentsErrorGenerator(prefix, command, scoreDomains) {
 }
 
 function titleCase(text) {
-    console.log(typeof text, text)
-
     return text.replace(
         /\w\S*/g,
         function (txt) {
@@ -63,7 +61,6 @@ function parseOperation(operation) {
 }
 
 function parseEntityIdentifier(entity) {
-    console.log(entity)
     if (entity.type === 'user' || entity.type === 'bot') {
         return `<@!${entity.id}>`
     } else if (entity.type === 'role') {

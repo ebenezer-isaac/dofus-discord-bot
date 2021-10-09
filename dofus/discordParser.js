@@ -33,10 +33,8 @@ async function parseMemberList(entityList, guild, guildRoles) {
 
 function parseMember(text, guildMembers, guildRoles, serverGuildRoles) {
     let {entityIdentifier, type} = parseIdFromMention(text)
-    console.log(text, entityIdentifier, type)
     if (entityIdentifier.match(/\d+/g) != null) {
         if (entityIdentifier.length === 17 || entityIdentifier.length === 18) {
-            console.log("id", entityIdentifier, entityIdentifier.length)
             if (type === undefined || type === 'user') {
                 let entity = guildMembers.find(user => user.user.id === entityIdentifier)
                 if (entity !== undefined) {
