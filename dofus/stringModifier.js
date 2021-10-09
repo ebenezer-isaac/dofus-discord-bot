@@ -41,12 +41,6 @@ function insufficientArgumentsErrorGenerator(prefix, command, scoreDomains) {
     return `Sufficient arguments were not found in your command\n${generateExampleCommands(prefix, command, scoreDomains)}`
 }
 
-function toCamelCase(text) {
-    return text
-        .replace(/(?:^\w|[A-Z]|\b\w)/g, (ltr, idx) => idx === 0 ? ltr.toLowerCase() : ltr.toUpperCase())
-        .replace(/\s+/g, '');
-}
-
 function titleCase(text) {
     console.log(typeof text, text)
 
@@ -77,30 +71,6 @@ function parseEntityIdentifier(entity) {
     } else {
         return entity.id
     }
-}
-
-function scoreUserList(scoreDomain, arr, limit) {
-    let fields = [{name: `Top ${limit} ${titleCase(scoreDomain)} Scores `, value: '', inline: false}]
-    let nameField = {name: `Player Name`, value: '', inline: true}
-    let scoreField = {name: `Score`, value: '', inline: true}
-    arr.for((user, index) => {
-        nameField.value += `${index + 1}. ${parseEntityIdentifier(user)}\n`
-        scoreField.value += `${user.score}\n`
-    })
-    fields.push(nameField, scoreField)
-    return fields
-}
-
-function scoreRoleList(scoreDomain, arr, limit) {
-    let fields = [{name: `Top ${limit} ${titleCase(scoreDomain)} Scores `, value: '', inline: false}]
-    let nameField = {name: `Guild Name`, value: '', inline: true}
-    let scoreField = {name: `Score`, value: '', inline: true}
-    arr.for((user, index) => {
-        nameField.value += `${index + 1}. ${parseEntityIdentifier(user)}\n`
-        scoreField.value += `${user.score}\n`
-    })
-    fields.push(nameField, scoreField)
-    return fields
 }
 
 function scoreChangeUserList(scoreDomain, arr, score, operation) {
@@ -168,7 +138,6 @@ const zeroPad = (num, places) => String(num).padStart(places, '0')
 
 module.exports = {
     generateExampleCommands,
-    toCamelCase,
     titleCase,
     scoreDomainsErrorGenerator,
     scoreRangeErrorGenerator,

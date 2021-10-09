@@ -1,5 +1,5 @@
 const {SlashCommandBuilder} = require('@discordjs/builders');
-
+const EmbedGenerator = require("../dofus/embedGenerator")
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('del-server')
@@ -8,12 +8,9 @@ module.exports = {
         if (interaction.user.id.toString() === "812756678361350216") {
             await interaction.deferReply();
             let message = await this.delServer(interaction.guildId, db)
-            await interaction.editReply(message)
+            return await interaction.editReply(new EmbedGenerator(true, "Server Prefix", interaction.user).simpleText(message))
         } else {
-            return interaction.reply({
-                content: `You are not authorized to perform this interaction. Only the bot owner has access to this command.`,
-                ephemeral: true
-            });
+            return await interaction.reply(new EmbedGenerator(false, "Delete Server", interaction.user).simpleText(`You are not authorized to perform this interaction. Only the bot owner has access to this command.`));
         }
     }, async delServer(guildId, db) {
         await db.connect()

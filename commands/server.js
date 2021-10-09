@@ -1,4 +1,5 @@
 const {SlashCommandBuilder} = require('@discordjs/builders');
+const EmbedGenerator = require("../dofus/embedGenerator")
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -7,8 +8,7 @@ module.exports = {
     async execute(interaction, db) {
         await interaction.deferReply();
         let message = await this.getDetails(interaction.guildId, interaction.guild.name, interaction.guild.memberCount, db)
-        console.log(message)
-        await interaction.editReply(message)
+        return await interaction.editReply(new EmbedGenerator(true, "Server Info", interaction.user).simpleText(message))
     }, async getDetails(guildId, guildName, guildMemberCount, db) {
         await db.connect()
         const status = await db.checkService(guildId);

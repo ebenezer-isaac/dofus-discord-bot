@@ -7,8 +7,6 @@ const MongoHelper = require('./dofus/MongoHelper.js')
 const {parseMember, parseMemberList, parseIdFromMention, parseLeaderboardArgs} = require("./dofus/discordParser")
 const {
     generateExampleCommands,
-    toCamelCase,
-    titleCase,
     scoreDomainsErrorGenerator,
     scoreRangeErrorGenerator,
     insufficientArgumentsErrorGenerator
@@ -77,8 +75,8 @@ client.on('messageCreate', async message => {
                 let args = message.content.slice(prefix.length).trim().split(/\s+/);
                 const command = args.shift().toLowerCase();
                 if (command === 'ping') {
-                    const embed = new EmbedGenerator(true, command, message.author);
-                    await message.reply(embed.simpleText(`Pong! ${Math.round(client.ws.ping)}ms`));
+                    const embed = new EmbedGenerator(true, "Pong!", message.author);
+                    await message.reply(embed.simpleText(`Latency : ${Math.round(client.ws.ping)}ms`));
                 } else if (scoreDomains.includes(command)) {
                     if (hasModPerms(guildId, message.member)) {
                         if (args.length > 0) {
@@ -162,7 +160,7 @@ client.on('messageCreate', async message => {
                         text = (entity.type === 'role' && text === '') ? 'The mentioned role is not registered as Guild Role' : "The mention provided in your command could not be identified"
                         return await message.reply(new EmbedGenerator(false, `Profile Command`, message.author).simpleText(text))
                     }
-                } else if (command === "top" || command === "leaderboard") {
+                } else if (command === "top" || command === "leaderboard" || command === "topmembers" || command === "leaderboards") {
                     let response = parseLeaderboardArgs(args, scoreDomains)
                     if (response.domainError) {
                         return await message.reply(new EmbedGenerator(false, `Member Leaderboard Command`, message.author).simpleText(scoreDomainsErrorGenerator(prefix, command, scoreDomains)))
@@ -178,7 +176,7 @@ client.on('messageCreate', async message => {
                     } else {
                         return await message.reply(new EmbedGenerator(false, `Member Leaderboard Command`, message.author).simpleText(`No Scores to show, try adding scores to members!`))
                     }
-                } else if (command === "topguild" || command === "leaderboardguild") {
+                } else if (command === "topguild" || command === "leaderboardguild" || command === "topguilds" || command === "leaderboardguilds") {
                     let response = parseLeaderboardArgs(args, scoreDomains)
                     if (response.domainError) {
                         return await message.reply(new EmbedGenerator(false, `Guild Leaderboard Command`, message.author).simpleText(scoreDomainsErrorGenerator(prefix, command, scoreDomains)))
@@ -273,7 +271,7 @@ client.on('messageCreate', async message => {
                                 return await message.reply(new EmbedGenerator(false, `Add Guild Command`, message.author).simpleText(`Mentioned Role is already registered as Guild Role`))
                             } else {
                                 guildRoles.push(role)
-                                await db.updateGuildRoles(guildId, role, guildRoles, scoreDomains)
+                                await db.updateGuildRoles(guildId, role, guildRoles)
                                 return await message.reply(new EmbedGenerator(true, `Add Guild Command`, message.author).simpleText(`Guild Role has been added successfully`))
                             }
                         } else {
@@ -295,7 +293,7 @@ client.on('messageCreate', async message => {
                             let guildRoles = guildCache[guildId].guildRoles
                             if (guildRoles.includes(role)) {
                                 guildRoles = guildRoles.filter(item => item !== role);
-                                await db.updateGuildRoles(guildId, role, guildRoles, scoreDomains, true)
+                                await db.updateGuildRoles(guildId, role, guildRoles)
                                 return await message.reply(new EmbedGenerator(true, `Delete Guild Command`, message.author).simpleText(`Guild Role has been removed successfully`))
                             } else {
                                 return await message.reply(new EmbedGenerator(false, `Delete Guild Command`, message.author).simpleText(`The mentioned Role is not a Guild Role`))

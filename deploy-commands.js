@@ -1,7 +1,7 @@
 const fs = require('fs');
 const {REST} = require('@discordjs/rest');
 const {Routes} = require('discord-api-types/v9');
-const MongoHelper = require('./dofus/mongodb.js')
+const MongoHelper = require('./dofus/MongoHelper.js')
 const db = new MongoHelper()
 require("dotenv").config()
 

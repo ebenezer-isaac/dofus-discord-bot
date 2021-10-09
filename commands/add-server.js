@@ -1,4 +1,5 @@
 const {SlashCommandBuilder} = require('@discordjs/builders');
+const EmbedGenerator = require("../dofus/EmbedGenerator");
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -10,12 +11,9 @@ module.exports = {
             let prefix = interaction.options.getString('prefix')
             await interaction.deferReply()
             let message = await this.addServer(interaction.guildId, prefix, db)
-            await interaction.editReply(message)
+            return await interaction.editReply(new EmbedGenerator(true, "Server Prefix", interaction.user).simpleText(message))
         } else {
-            return interaction.reply({
-                content: `You are not authorized to perform this interaction. Only the bot owner has access to this command.`,
-                ephemeral: true
-            });
+            return await interaction.reply(new EmbedGenerator(false, "Delete Server", interaction.user).simpleText(`You are not authorized to perform this interaction. Only the bot owner has access to this command.`));
         }
     }, async addServer(guildId, prefix, db) {
         await db.connect()

@@ -80,14 +80,12 @@ module.exports = class MongoHelper {
         return response
     }
 
-    async updateGuildRoles(guildId, roleId, guildRoles, scoreDomains, del = false) {
-        let updateObject = {guildRoles}
-        scoreDomains.forEach(scoreDomain => {
-            updateObject[`guildRoleScores.${roleId}.${scoreDomain}`] = 0
-        })
+    async updateGuildRoles(guildId, roleId, guildRoles) {
+        let updateObject = {}
+        updateObject[`guildRoleScores.${roleId}`] = {};
         let response = await this.client.db(this.DB_NAME).collection("guilds").updateOne(
             {guildId},
-            {$set: updateObject},
+            {$set: {guildRoles}, $unset: updateObject},
             {upsert: true}
         )
         this.eventEmitter.emit('cacheUpdate');

@@ -61,7 +61,7 @@ module.exports = class embedGenerator {
     }
 
     roleProfile(entity, scoreDomains) {
-        this.embed.addField(`${entity.name}`,parseEntityIdentifier(entity), false);
+        this.embed.addField(`${entity.name}`, parseEntityIdentifier(entity), false);
         this.embed.addField(`Guild Rank : #\ ${entity.scoreCard.rank}`, '\u200B', false)
         let lineSeparator = '----------------------------->\n'
         let scoreValues = lineSeparator
@@ -74,7 +74,7 @@ module.exports = class embedGenerator {
     }
 
     userProfile(entity, scoreDomains) {
-        this.embed.addField(`${entity.username}#${entity.discriminator}`,parseEntityIdentifier(entity), false);
+        this.embed.addField(`${entity.username}#${entity.discriminator}`, parseEntityIdentifier(entity), false);
         this.embed.setThumbnail(`https://cdn.discordapp.com/avatars/${entity.id}/${entity.avatar}.png`);
         this.embed.addField(`Member Rank : #\ ${entity.scoreCard.rank}`, '\u200B', false)
         let lineSeparator = '----------------------------->\n'
