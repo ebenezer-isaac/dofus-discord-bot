@@ -1,5 +1,4 @@
-function generateExampleCommands(prefix, command, scoreDomains) {
-
+function constructExampleCommands(scoreDomains) {
     const getRandomScore = () => {
         return Math.floor(Math.random() * 10) + 1
     }
@@ -9,17 +8,27 @@ function generateExampleCommands(prefix, command, scoreDomains) {
         "remove": [],
         "profile": ["profile", "profile @member"],
         "top": ["top", `top ${getRandomScore()}`],
+        "topguild": ["top", `top ${getRandomScore()}`],
         "reset": ["reset"],
         "addmod": ["addmod @member"],
         "delmod": ["delmod @member"],
-        "listmod": ["listmod"]
+        "listmod": ["listmod"],
+        "addguild": ["addguild @member"],
+        "delguild": ["delguild @member"],
+        "listguild": ["listguild"]
     }
     scoreDomains.forEach(scoreDomain => {
         exampleCommands[scoreDomain] = [`${scoreDomain} ${getRandomScore()} @member`]
         exampleCommands.set.push(`set ${scoreDomain} ${getRandomScore()} @member`)
         exampleCommands.remove.push(`remove ${scoreDomain} ${getRandomScore()} @member`)
         exampleCommands.top.push(`top ${scoreDomain} ${getRandomScore()}`)
+        exampleCommands.topguild.push(`topguild ${scoreDomain} ${getRandomScore()}`)
     })
+    return exampleCommands
+}
+
+function generateExampleCommands(prefix, command, scoreDomains) {
+    const exampleCommands = constructExampleCommands(scoreDomains)
     const commands = exampleCommands[command]
     let text = `Example Command${commands.length > 1 ? "s" : ""} : \n`
     commands.forEach((example, index) => {
@@ -28,6 +37,7 @@ function generateExampleCommands(prefix, command, scoreDomains) {
     text += `\n`
     return text
 }
+
 
 function scoreDomainsErrorGenerator(prefix, command, scoreDomains) {
     return `There was an error with the score domain in your command\n${generateExampleCommands(prefix, command, scoreDomains)}Set command has to be followed by ${scoreDomains.join("/")}. None of them were found`
@@ -134,6 +144,7 @@ function scoreChangeNotFoundList(arr) {
 const zeroPad = (num, places) => String(num).padStart(places, '0')
 
 module.exports = {
+    constructExampleCommands,
     generateExampleCommands,
     titleCase,
     scoreDomainsErrorGenerator,

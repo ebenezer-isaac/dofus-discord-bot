@@ -15,7 +15,7 @@ const EmbedGenerator = require("./dofus/EmbedGenerator")
 const eventEmitter = new EventEmitter();
 const db = new MongoHelper("dofus", eventEmitter)
 let guildCache = {}
-let scoreDomains = ["attack", "defence", "koth"]
+let scoreDomains = ["attack", "defence", "koth", "pvm"]
 scoreDomains.sort()
 
 const client = new Client({intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_MESSAGES, Intents.FLAGS.GUILD_MEMBERS]});
@@ -312,6 +312,8 @@ client.on('messageCreate', async message => {
                     } else {
                         return await message.reply(new EmbedGenerator(false, `Guild List`, message.author).simpleText(`No Guild Roles have been added yet!`))
                     }
+                } else if (command === 'help') {
+                    return await message.reply(new EmbedGenerator(true, `Help Section`, message.author).help(prefix, scoreDomains))
                 }
             } else {
                 const embed = new EmbedGenerator(false, "Bot Permission Error", message.author)

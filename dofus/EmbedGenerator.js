@@ -1,5 +1,6 @@
 const {MessageEmbed} = require("discord.js");
 const {
+    constructExampleCommands,
     titleCase,
     scoreChangeUserList,
     scoreChangeRoleList,
@@ -96,6 +97,40 @@ module.exports = class embedGenerator {
         leaderboardText += lineSeparator
         this.embed.addField(`Rank | Score | Mentions\n`, leaderboardText, true)
         return this.encloseReply();
+    }
+
+    help(prefix, scoreDomains) {
+        const description = {
+            "ping": "Latency between API and Server",
+            "set": "Change Scores of Members/Guilds for specific categories\nRequires : Mod Role",
+            "remove": "Reduce Scores of Members/Guilds for specific categories\nRequires : Mod Role",
+            "profile": "View Profile of Members/Guilds",
+            "top": "Display Highest ranking Members for overall or specific categories",
+            "topguild": "Display Highest ranking Guilds for overall or specific categories",
+            "reset": "Reset Scores for Members and Guilds\nRequires : Administrator Permissions",
+            "addmod": "Add Mod Role defining who can change the Scores\nRequires : Administrator Permissions",
+            "delmod": "Unregister a previously registered Mod Role\nRequires : Administrator Permissions",
+            "listmod": "List all registered Mod Roles",
+            "addguild": "Register a Role as Guild Role\nRequires : Administrator Permissions",
+            "delguild": "Unregister a previously registered Guild Role\nRequires : Administrator Permissions",
+            "listguild": "List all registered Guild Roles",
+            "help": "This Page",
+        }
+        scoreDomains.forEach(scoreDomain => {
+            description[scoreDomain] = `Add ${titleCase(scoreDomain)} Scores to Members/Roles\nRequires : Mod Role`
+        })
+        const exampleCommands = constructExampleCommands(scoreDomains)
+        const commandList = Object.keys(exampleCommands)
+        commandList.forEach((command, index) => {
+            const commands = exampleCommands[command]
+            let examples = `Example Command${commands.length > 1 ? "s" : ""} : \n`
+            commands.forEach((example, index) => {
+                examples += `${index + 1}. ${prefix}${example}\n`
+            })
+            this.embed.addField(`${index + 1}. ${command}`, `${description[command]}\n${examples}`, false)
+        })
+        return this.encloseReply();
+
     }
 
     encloseReply() {
