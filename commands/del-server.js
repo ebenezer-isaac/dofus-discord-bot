@@ -1,5 +1,5 @@
 const {SlashCommandBuilder} = require('@discordjs/builders');
-const EmbedGenerator = require("../dofus/embedGenerator")
+const EmbedGenerator = require("../dofus/EmbedGenerator")
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('del-server')

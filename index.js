@@ -11,7 +11,7 @@ const {
     scoreRangeErrorGenerator,
     insufficientArgumentsErrorGenerator
 } = require("./dofus/stringModifier")
-const EmbedGenerator = require("./dofus/embedGenerator")
+const EmbedGenerator = require("./dofus/EmbedGenerator")
 const eventEmitter = new EventEmitter();
 const db = new MongoHelper("dofus", eventEmitter)
 let guildCache = {}
