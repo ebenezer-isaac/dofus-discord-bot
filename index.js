@@ -27,13 +27,18 @@ for (const file of commandFiles) {
 }
 
 const hasModPerms = (guildId, member) => {
-    let memberRoles = member.roles.cache
     let modRoles = guildCache[guildId].modRoles
-    let modPerm = hasAdminPerms(member);
-    if (modPerm === false && modRoles.length > 0) {
-        modPerm = modRoles.some(roleId => memberRoles.has(roleId))
+    if (modRoles.length === 0) {
+        return true
+    } else {
+        let memberRoles = member.roles.cache
+        let modPerm = hasAdminPerms(member);
+        if (modPerm === false) {
+            modPerm = modRoles.some(roleId => memberRoles.has(roleId))
+        }
+        return modPerm
     }
-    return modPerm
+
 }
 
 const hasAdminPerms = (member) => {

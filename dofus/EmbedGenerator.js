@@ -1,4 +1,5 @@
 const {MessageEmbed} = require("discord.js");
+const lineSeparator = '----------------------------->\n'
 const {
     constructExampleCommands,
     titleCase,
@@ -67,12 +68,11 @@ module.exports = class embedGenerator {
             this.embed.addField(`Guild Rank : #\ ${entity.scoreCard.rank}`, '\u200B', false)
         }
 
-        let lineSeparator = '----------------------------->\n'
         let scoreValues = lineSeparator
         scoreDomains.forEach((scoreDomain) => {
-            scoreValues += `\|\ \ ${zeroPad(parseInt(entity.scoreCard[scoreDomain]), 3)}` + `\ \ \|\ \ ` + `${titleCase(scoreDomain)}\n`
+            scoreValues += `${parseInt(entity.scoreCard[scoreDomain])}` + ` -> ` + `${titleCase(scoreDomain)}\n`
         })
-        scoreValues += `${lineSeparator}\|\ \ ${zeroPad(parseInt(entity.scoreCard.total), 3)}` + `\ \ \|\ \ ` + `Total\n${lineSeparator}`
+        scoreValues += `${lineSeparator}${parseInt(entity.scoreCard.total)}` + ` -> ` + `Total\n${lineSeparator}`
         this.embed.addField(`Score Card\n`, scoreValues, true)
         return this.encloseReply();
     }
@@ -86,9 +86,9 @@ module.exports = class embedGenerator {
         let lineSeparator = '----------------------------->\n'
         let scoreValues = lineSeparator
         scoreDomains.forEach((scoreDomain) => {
-            scoreValues += `\|\ \ ${zeroPad(parseInt(entity.scoreCard[scoreDomain]), 3)}` + `\ \ \|\ \ ` + `${titleCase(scoreDomain)}\n`
+            scoreValues += `${parseInt(entity.scoreCard[scoreDomain])}` + ` -> ` + `${titleCase(scoreDomain)}\n`
         })
-        scoreValues += `${lineSeparator}\|\ \ ${zeroPad(parseInt(entity.scoreCard.total), 3)}` + `\ \ \|\ \ ` + `Total\n${lineSeparator}`
+        scoreValues += `${lineSeparator}${parseInt(entity.scoreCard.total)}` + ` -> ` + `Total\n${lineSeparator}`
         this.embed.addField(`Score Card\n`, scoreValues, true)
         return this.encloseReply();
     }
@@ -97,10 +97,10 @@ module.exports = class embedGenerator {
         let lineSeparator = '----------------------------->\n'
         let leaderboardText = lineSeparator
         scores.forEach((entity, index) => {
-            leaderboardText += `\|\ \ ${zeroPad(index + 1, 3)}\ \ \|\ \ ${zeroPad(parseInt(entity[scoreDomain]), 3)}\ \ \|\ \ ${parseEntityIdentifier(entity)}\n`
+            leaderboardText += `\ \ ${index + 1}.\ \ ${parseEntityIdentifier(entity)}\ ->\ ${parseInt(entity[scoreDomain])}\n`
         })
         leaderboardText += lineSeparator
-        this.embed.addField(`Rank | Score | Mentions\n`, leaderboardText, true)
+        this.embed.addField(`Rank | Mentions -> ${titleCase(scoreDomain)} Score\n`, leaderboardText, true)
         return this.encloseReply();
     }
 

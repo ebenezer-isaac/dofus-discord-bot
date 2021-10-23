@@ -1,13 +1,13 @@
+require("dotenv").config()
 const fs = require('fs');
 const {REST} = require('@discordjs/rest');
 const {Routes} = require('discord-api-types/v9');
 const MongoHelper = require('./dofus/MongoHelper.js')
-const db = new MongoHelper()
-require("dotenv").config()
+const db = new MongoHelper("dofus")
+
 
 const commands = [];
 const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
-
 for (const file of commandFiles) {
     const command = require(`./commands/${file}`);
     commands.push(command.data.toJSON());
@@ -26,5 +26,3 @@ async function deployCommands() {
 }
 
 deployCommands().then(() => console.log("Commands have been deployed"))
-
-
