@@ -11,6 +11,12 @@ function parseIdFromMention(mention) {
             type: 'role'
         }
     }
+    if (mention.startsWith("<@") && mention.endsWith(">")) {
+        return {
+            entityIdentifier: mention.substring(2, mention.length - 1),
+            type: 'user'
+        }
+    }
     return {
         entityIdentifier: mention
     }
