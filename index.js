@@ -93,7 +93,7 @@ client.on('messageCreate', async message => {
                                 foundUsers.length > 0 ? await db.updateScores(scoreDomains, guildId, command, foundUsers, score) : {}
                                 return await message.reply(new EmbedGenerator(true, `${command} Command`, message.author).scoreChange(command, result, score, "add"));
                             } else {
-                                return await message.reply(new EmbedGenerator(false, `${command} Command Error`, message.author).simpleText(scoreDomainsErrorGenerator(prefix, command, scoreDomains)))
+                                return await message.reply(new EmbedGenerator(false, `${command} Command Error`, message.author).simpleText(scoreRangeErrorGenerator(prefix, command, scoreDomains)))
                             }
                         } else {
                             return await message.reply(new EmbedGenerator(false, `${command} Command Error`, message.author).simpleText(insufficientArgumentsErrorGenerator(prefix, command, scoreDomains)))
