@@ -106,6 +106,7 @@ function parseLeaderboardArgs(args, scoreDomains) {
         scoreError: false,
         domainError: false
     }
+    args.sort()
     if (args.length > 0 && !isNaN(parseInt(args[0]))) {
         response.limit = parseInt(args.shift())
         if (response.limit < 5 || response.limit > 100) {
