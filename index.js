@@ -107,14 +107,14 @@ client.on('messageCreate', async message => {
                             let scoreDomain = args.shift().toLowerCase();
                             if (scoreDomains.includes(scoreDomain)) {
                                 let score = parseInt(args.shift())
-                                if (score > 0 && score <= 100) {
+                                if (score > 0 && score <= 1000) {
                                     let result = await parseMemberList(args, message.guild, guildCache[guildId].guildRoles)
                                     console.log(result);
                                     let foundUsers = result.filter(entity => (entity.isGuildRole === true || entity.type === 'user'))
                                     foundUsers.length > 0 ? await db.setScores(guildId, scoreDomain, foundUsers, score) : {}
                                     return await message.reply(new EmbedGenerator(true, `${command} Command`, message.author).scoreChange(scoreDomain, result, score, "set"));
                                 } else {
-                                    return await message.reply(new EmbedGenerator(false, `${command} Command Error`, message.author).simpleText(scoreRangeErrorGenerator(prefix, command, scoreDomains)))
+                                    return await message.reply(new EmbedGenerator(false, `${command} Command Error`, message.author).simpleText(scoreRangeErrorGenerator(prefix, command, scoreDomains, 1000)))
                                 }
                             } else {
                                 return await message.reply(new EmbedGenerator(false, `${command} Command Error`, message.author).simpleText(scoreDomainsErrorGenerator(prefix, command, scoreDomains)))

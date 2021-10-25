@@ -43,8 +43,8 @@ function scoreDomainsErrorGenerator(prefix, command, scoreDomains) {
     return `There was an error with the score domain in your command\n${generateExampleCommands(prefix, command, scoreDomains)}${titleCase(command)} command has to be followed by ${scoreDomains.join("/")}. None of them were found`
 }
 
-function scoreRangeErrorGenerator(prefix, command, scoreDomains) {
-    return `There was an error with the score specified in your command\n${generateExampleCommands(prefix, command, scoreDomains)}Change in score should be a positive number between 1 and 100.`
+function scoreRangeErrorGenerator(prefix, command, scoreDomains, range = 100) {
+    return `There was an error with the score specified in your command\n${generateExampleCommands(prefix, command, scoreDomains)}Change in score should be a positive number between 1 and ${range}.`
 }
 
 function insufficientArgumentsErrorGenerator(prefix, command, scoreDomains) {
