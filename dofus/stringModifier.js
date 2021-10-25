@@ -44,7 +44,7 @@ function scoreDomainsErrorGenerator(prefix, command, scoreDomains) {
 }
 
 function scoreRangeErrorGenerator(prefix, command, scoreDomains) {
-    return `There was an error with the score specified in your command\n${generateExampleCommands(prefix, command, scoreDomains)}Change in score should be between 1 and 100`
+    return `There was an error with the score specified in your command\n${generateExampleCommands(prefix, command, scoreDomains)}Change in score should be a positive number between 1 and 100.`
 }
 
 function insufficientArgumentsErrorGenerator(prefix, command, scoreDomains) {

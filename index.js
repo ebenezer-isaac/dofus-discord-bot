@@ -86,7 +86,7 @@ client.on('messageCreate', async message => {
                     if (hasModPerms(guildId, message.member)) {
                         if (args.length > 0) {
                             args.sort()
-                            let score = (parseInt(args[0]) > 0 && args[0].length < 16) ? parseInt(args.shift()) : 1;
+                            let score = (args[0].length > 0 && args[0].length < 5) ? parseInt(args.shift()) : 1;
                             if (score > 0 && score <= 100) {
                                 let result = await parseMemberList(args, message.guild, guildCache[guildId].guildRoles)
                                 let foundUsers = result.filter(entity => (entity.isGuildRole === true || entity.type === 'user'))
