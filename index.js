@@ -102,7 +102,7 @@ client.on('messageCreate', async message => {
                         return await message.reply(new EmbedGenerator(false, `${command} Command Error`, message.author).permissionError())
                     }
                 } else if (command === "set") {
-                    if (hasModPerms(guildId, message.member)) {
+                    if (hasAdminPerms(message.member)) {
                         if (args.length > 2) {
                             let scoreDomain = args.shift().toLowerCase();
                             if (scoreDomains.includes(scoreDomain)) {
@@ -126,7 +126,7 @@ client.on('messageCreate', async message => {
                         await message.reply(new EmbedGenerator(false, `${command} Error`, message.author).permissionError())
                     }
                 } else if (command === "remove") {
-                    if (hasModPerms(guildId, message.member)) {
+                    if (hasAdminPerms(message.member)) {
                         if (args.length > 2) {
                             let scoreDomain = args.shift().toLowerCase();
                             if (scoreDomains.includes(scoreDomain)) {

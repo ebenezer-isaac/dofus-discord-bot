@@ -107,8 +107,8 @@ module.exports = class embedGenerator {
     help(prefix, scoreDomains) {
         const description = {
             "ping": "Latency between API and Server",
-            "set": "Change Scores of Members/Guilds for specific categories\nRequires : Mod Role",
-            "remove": "Reduce Scores of Members/Guilds for specific categories\nRequires : Mod Role",
+            "set": "Change Scores of Members/Guilds for specific categories\nRequires : Administrator Permissions",
+            "remove": "Reduce Scores of Members/Guilds for specific categories\nRequires : Administrator Permissions",
             "profile": "View Profile of Members/Guilds",
             "top": "Display Highest ranking Members for overall or specific categories",
             "topguild": "Display Highest ranking Guilds for overall or specific categories",
