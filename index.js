@@ -51,7 +51,7 @@ client.once('ready', async () => {
     console.log('Connected!');
     guildCache = await db.getGuildCache();
     console.log('Ready for use!')
-});
+})
 
 client.on('interactionCreate', async interaction => {
     if (!interaction.isCommand()) return;
@@ -333,5 +333,5 @@ eventEmitter.on('cacheUpdate', async () => {
     guildCache = await db.getGuildCache();
 });
 keepAlive()
-client.login(process.env.TOKEN).then(() => {
-});
+client.login(process.env.TOKEN)
+console.log("End")
